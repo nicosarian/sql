@@ -54,7 +54,63 @@ The store wants to keep customer addresses. Propose two architectures for the CU
 **HINT:** search type 1 vs type 2 slowly changing dimensions. 
 
 ```
-Your answer...
+# SCD Type 1 vs Type 2 — Customer Addresses
+
+Some data doesn't change often, but when it does, one has a choice: forget the past, or keep it. That's the whole game with Slowly Changing Dimensions.
+
+---
+
+## Type 1 — Amnesia mode
+
+Customer moves? One overwrites. One row per customer, always current, history gone.
+
+```
+customer_address (Type 1)
+──────────────────────────────────────────
+address_id       INT          PK
+customer_id      INT          FK → customer
+street_address   VARCHAR(100)
+city             VARCHAR(50)
+state_province   VARCHAR(50)
+postal_code      VARCHAR(20)
+```
+
+Simple, small, zero drama. Great for fixing typos. Terrible if one ever needs to ask *"where did we ship that order six months ago?"*
+
+---
+
+## Type 2 — Full memory mode
+
+Customer moves? One closes the old record and opens a new one. Every address the customer ever had lives in this table forever.
+
+```
+customer_address (Type 2)
+──────────────────────────────────────────
+address_id            INT          PK  ← new key per version
+customer_id           INT          FK → customer
+street_address        VARCHAR(100)
+city                  VARCHAR(50)
+state_province        VARCHAR(50)
+postal_code           VARCHAR(20)
+effective_start_date  DATE             ← went live on this date
+effective_end_date    DATE             ← NULL = still active
+is_current            BOOLEAN          ← quick filter shortcut
+```
+
+More rows, more complexity — but one can time-travel. Join on `order_date_key` between `effective_start_date` and `effective_end_date` and every order snaps to the address that existed when it was placed.
+
+---
+
+## Which one for the bookstore?
+
+| | Type 1 | Type 2 |
+|---|---|---|
+| Address change | `UPDATE` | `INSERT` new + close old |
+| History | Gone | Full timeline |
+| Table size | Stays small | Grows over time |
+| Best for | Typo corrections | Dispute resolution, delivery history |
+
+**Type 2 wins here.** A lost package, a disputed order, an audit — all of these require knowing the address *at the time*, not today's address.
 ```
 
 ***
